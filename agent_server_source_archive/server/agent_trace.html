@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Agent 内部对话面板</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg:#0a0d12;--panel:#11161f;--panel2:#171e29;--line:#273143;
+      --text:#e5eaf2;--muted:#8b98aa;--blue:#6aa7ff;--green:#52d39a;
+      --amber:#f2ba66;--red:#ff7474;--violet:#ad91ff;
+    }
+    *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);
+      font-family:Inter,"PingFang SC","Microsoft YaHei",system-ui,sans-serif;min-height:100vh}
+    button{font:inherit}.top{height:64px;display:flex;align-items:center;gap:14px;padding:0 22px;
+      border-bottom:1px solid var(--line);background:rgba(17,22,31,.96);position:sticky;top:0;z-index:10}
+    .brand{font-weight:750;letter-spacing:.02em}.sub{font-size:12px;color:var(--muted)}
+    .connection{margin-left:auto;display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+    .dot{width:9px;height:9px;border-radius:50%;background:#596273}.dot.online{background:var(--green);box-shadow:0 0 10px #52d39a88}
+    .shell{max-width:1120px;margin:0 auto;padding:20px}.pager{display:grid;grid-template-columns:auto 1fr auto;
+      align-items:center;gap:12px;margin-bottom:16px}.nav{border:1px solid var(--line);background:var(--panel2);
+      color:var(--text);border-radius:9px;padding:8px 13px;cursor:pointer}.nav:disabled{opacity:.35;cursor:default}
+    .page-meta{text-align:center}.page-count{font-size:13px;font-weight:650}.page-hint{font-size:11px;color:var(--muted);margin-top:3px}
+    .empty{min-height:60vh;border:1px dashed var(--line);border-radius:16px;display:grid;place-items:center;text-align:center;color:var(--muted)}
+    .empty strong{display:block;color:var(--text);font-size:17px;margin-bottom:8px}.trace{display:none}.trace.visible{display:block}
+    .hero{background:linear-gradient(145deg,#141b27,#10151d);border:1px solid var(--line);border-radius:16px;padding:18px 20px;margin-bottom:15px}
+    .hero-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.turn-title{font-size:19px;font-weight:760;margin-right:auto}
+    .badge{font-size:11px;border:1px solid var(--line);border-radius:999px;padding:5px 9px;color:var(--muted);background:#0d121a}
+    .badge.running{color:var(--blue)}.badge.completed{color:var(--green)}.badge.error{color:var(--red)}
+    .memory-note{margin-top:11px;color:var(--muted);font-size:12px;line-height:1.55}.prompt{margin-top:14px;padding:14px 16px;border-radius:11px;background:#0c1119;border-left:3px solid var(--blue);white-space:pre-wrap;word-break:break-word;line-height:1.6}
+    .section-label{font-size:12px;color:var(--muted);letter-spacing:.12em;text-transform:uppercase;margin:19px 2px 10px}
+    .timeline{position:relative;padding-left:28px}.timeline:before{content:"";position:absolute;left:10px;top:4px;bottom:4px;width:1px;background:var(--line)}
+    .event{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:12px;margin:0 0 11px;padding:13px 15px}
+    .event:before{content:"";position:absolute;left:-23px;top:17px;width:9px;height:9px;border-radius:50%;background:var(--blue);box-shadow:0 0 0 4px var(--bg)}
+    .event.tool_call:before{background:var(--amber)}.event.tool_result:before{background:var(--green)}.event.policy:before,.event.error:before{background:var(--red)}
+    .event-head{display:flex;align-items:center;gap:8px}.event-title{font-size:13px;font-weight:700}.event-time{margin-left:auto;font-size:10px;color:var(--muted)}
+    .event-body{margin-top:9px;color:#cbd3df;font-size:12px;line-height:1.6;white-space:pre-wrap;word-break:break-word;max-height:260px;overflow:auto}
+    .params{display:grid;grid-template-columns:max-content 1fr;gap:5px 12px}.key{color:var(--amber)}
+    details summary{cursor:pointer;color:var(--blue);font-size:12px}.final{border:1px solid #285944;background:#10251d;border-radius:14px;padding:16px 18px;margin-top:12px}
+    .final .label{font-size:11px;color:var(--green);letter-spacing:.1em}.final .text{font-size:16px;line-height:1.7;margin-top:7px;white-space:pre-wrap;word-break:break-word}
+    .disclaimer{color:#667386;font-size:11px;text-align:center;padding:20px 0 8px}
+    @media(max-width:650px){.top{padding:0 13px}.sub{display:none}.shell{padding:13px}.hero{padding:15px}.turn-title{width:100%}.timeline{padding-left:22px}.timeline:before{left:7px}.event:before{left:-20px}}
+  </style>
+</head>
+<body>
+  <header class="top">
+    <div><div class="brand">Agent 内部对话面板</div><div class="sub">只读 · 每个顶层用户输入独立成页</div></div>
+    <div class="connection"><span class="dot" id="dot"></span><span id="connection">正在连接事件流</span></div>
+  </header>
+  <main class="shell">
+    <div class="pager">
+      <button class="nav" id="prev" aria-label="上一轮">← 上一轮</button>
+      <div class="page-meta"><div class="page-count" id="pageCount">尚无轮次</div><div class="page-hint">新轮次开始时自动切换到新页面</div></div>
+      <button class="nav" id="next" aria-label="下一轮">下一轮 →</button>
+    </div>
+    <div class="empty" id="empty"><div><strong>等待 Agent 对话</strong>面板将自动显示用户提示、模型输出、工具调用、工具结果与最终播报。</div></div>
+    <section class="trace" id="trace">
+      <div class="hero">
+        <div class="hero-row"><div class="turn-title" id="turnTitle"></div><span class="badge" id="modeBadge"></span><span class="badge" id="statusBadge"></span></div>
+        <div class="memory-note" id="memoryNote"></div>
+        <div class="prompt" id="prompt"></div>
+      </div>
+      <div class="section-label">可观测执行路径</div>
+      <div class="timeline" id="timeline"></div>
+      <div class="final" id="final" hidden><div class="label">最终输出</div><div class="text" id="finalText"></div></div>
+    </section>
+    <div class="disclaimer">这里展示 Agent 实际产生的模型输出、命令和工具结果，不展示或推断模型隐藏思维链。</div>
+  </main>
+<script>
+(() => {
+  const traces = new Map(); let order = []; let selected = -1; let socket; let retry;
+  const $ = id => document.getElementById(id);
+  const labels = {model_start:'模型调用',model_output:'模型输出',tool_call:'工具调用',tool_result:'工具返回',policy:'执行策略',mode_switch:'模式切换',error:'处理错误'};
+  const safe = value => value == null ? '' : String(value);
+  const formatTime = ts => { try { return new Date(Number(ts)*1000).toLocaleTimeString('zh-CN',{hour12:false}); } catch(_) { return ''; } };
+  function setOnline(ok, text){ $('dot').className='dot'+(ok?' online':''); $('connection').textContent=text; }
+  function normalizeTrace(t){ return {trace_id:t.trace_id,session_id:t.session_id||'',mode:t.mode||'',created_at:t.created_at||Date.now()/1000,updated_at:t.updated_at||0,status:t.status||'running',events:Array.isArray(t.events)?t.events:[]}; }
+  function upsertTrace(t, auto=false){
+    const id=t.trace_id; if(!id)return; const exists=traces.has(id); traces.set(id,normalizeTrace(t));
+    if(!exists) order.push(id); order.sort((a,b)=>traces.get(a).created_at-traces.get(b).created_at);
+    if(auto || selected<0) selected=order.indexOf(id); render();
+  }
+  function applyEvent(e){
+    if(!e||!e.trace_id)return; let t=traces.get(e.trace_id); const fresh=!t;
+    if(!t){t=normalizeTrace({trace_id:e.trace_id,session_id:e.session_id,mode:e.mode,created_at:e.timestamp,events:[]}); order.push(e.trace_id);}
+    t.events.push(e); t.updated_at=e.timestamp||Date.now()/1000; if(e.session_id)t.session_id=e.session_id;if(e.mode)t.mode=e.mode;
+    if(e.type==='turn_end')t.status=safe((e.payload||{}).status)||'completed'; if(e.type==='error')t.status='error'; traces.set(e.trace_id,t);
+    if(fresh || e.type==='turn_start') selected=order.indexOf(e.trace_id); render();
+  }
+  async function loadSnapshot(){ try{const r=await fetch('/v1/agent/traces',{cache:'no-store'});if(!r.ok)return;const d=await r.json();(d.traces||[]).forEach(t=>upsertTrace(t,false));if(order.length){selected=order.length-1;render();}}catch(_){} }
+  function connect(){
+    clearTimeout(retry); const proto=location.protocol==='https:'?'wss:':'ws:'; socket=new WebSocket(proto+'//'+location.host+'/v1/agent/events/ws');
+    socket.onopen=()=>setOnline(true,'事件流已连接');
+    socket.onmessage=ev=>{try{const m=JSON.parse(ev.data);if(m.type==='snapshot'){(m.traces||[]).forEach(t=>upsertTrace(t,false));if(selected<0&&order.length)selected=order.length-1;render();}else if(m.type==='agent_event')applyEvent(m.event);}catch(err){console.warn(err)}};
+    socket.onclose=()=>{setOnline(false,'连接中断，正在重连');retry=setTimeout(connect,1500)};socket.onerror=()=>socket.close();
+  }
+  function promptOf(events){const e=events.find(x=>x.type==='turn_start');return safe(e&&e.payload&&e.payload.prompt)||'（未提供提示词）';}
+  function finalOf(events){const xs=events.filter(x=>x.type==='final_output');if(!xs.length)return null;return xs[xs.length-1].payload||{};}
+  function bodyFor(e){const p=e.payload||{};
+    if(e.type==='model_start') return `第 ${safe(p.iteration)||'?'} 次模型调用`;
+    if(e.type==='model_output') return escapeHtml(safe(p.text)||'（空输出）');
+    if(e.type==='tool_call'){const rows=Object.entries(p.params||{}).map(([k,v])=>`<span class="key">${escapeHtml(k)}</span><span>${escapeHtml(typeof v==='string'?v:JSON.stringify(v))}</span>`).join('');return `<div><b>${escapeHtml(safe(p.name))}</b> · ${escapeHtml(safe(p.command_type))}</div>${rows?`<div class="params" style="margin-top:8px">${rows}</div>`:''}`;}
+    if(e.type==='tool_result') return `${p.success?'成功':'失败'} · ${escapeHtml(safe(p.name))}\n${escapeHtml(safe(p.data||p.error||'（无返回内容）'))}`;
+    if(e.type==='policy') return escapeHtml(safe(p.message));
+    if(e.type==='mode_switch') return '目标模式：'+escapeHtml(safe(p.target));
+    if(e.type==='error') return escapeHtml(safe(p.message)); return escapeHtml(JSON.stringify(p,null,2));
+  }
+  function escapeHtml(s){return safe(s).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));}
+  function render(){
+    const has=order.length>0; $('empty').style.display=has?'none':'grid'; $('trace').className='trace'+(has?' visible':'');
+    $('prev').disabled=!has||selected<=0;$('next').disabled=!has||selected>=order.length-1;$('pageCount').textContent=has?`第 ${selected+1} / ${order.length} 轮`:'尚无轮次';if(!has)return;
+    const t=traces.get(order[selected]);const ev=t.events||[];$('turnTitle').textContent='轮次 '+(selected+1);$('modeBadge').textContent=t.mode||'未知模式';
+    $('statusBadge').textContent=t.status==='running'?'进行中':t.status==='error'?'失败':'已完成';$('statusBadge').className='badge '+t.status;
+    $('memoryNote').textContent=`上下文会话 ${t.session_id||'未知'} · 本页只展示一个顶层用户输入；相同会话 ID 表示 Agent 实际沿用了同一份上下文。`;
+    $('prompt').textContent=promptOf(ev); const visible=ev.filter(e=>!['turn_start','turn_end','final_output'].includes(e.type));
+    $('timeline').innerHTML=visible.map(e=>`<article class="event ${escapeHtml(e.type)}"><div class="event-head"><span class="event-title">${escapeHtml(labels[e.type]||e.type)}</span><span class="event-time">${formatTime(e.timestamp)}</span></div><div class="event-body">${bodyFor(e)}</div></article>`).join('')||'<article class="event"><div class="event-body">等待下一步事件…</div></article>';
+    const f=finalOf(ev);$('final').hidden=!f;if(f)$('finalText').textContent=safe(f.text)||'（空输出）';
+  }
+  $('prev').onclick=()=>{if(selected>0){selected--;render()}};$('next').onclick=()=>{if(selected<order.length-1){selected++;render()}};
+  loadSnapshot().finally(connect);
+})();
+</script>
+</body>
+</html>

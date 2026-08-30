@@ -1,0 +1,1 @@
+/usr/bin/c++ -fPIC   -shared  -o chat.cpython-310-aarch64-linux-gnu.so CMakeFiles/chat.dir/chat.cpp.o   -L/opt/sophon/libsophon-current/lib  -Wl,-rpath,/opt/sophon/libsophon-current/lib: -lbmrt -lbmlib 

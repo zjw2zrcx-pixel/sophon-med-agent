@@ -1,0 +1,367 @@
+#!/usr/bin/env python3
+# ==============================================================================
+#
+# Copyright (C) 2025 Sophgo Technologies Inc.  All rights reserved.
+#
+# TPU-MLIR is licensed under the 2-Clause BSD License except for the
+# third-party components.
+#
+# ==============================================================================
+
+import argparse
+import importlib
+import os
+import sys
+
+# A source-tree compiler can provide freshly generated MLIR Python dialects
+# without modifying the activated TPU-MLIR installation.  Insert this path
+# before importing pymlir/LLM converters because the venv's .pth file places
+# its installed (older) dialect first.
+_build_python = os.environ.get("TPU_MLIR_BUILD_PYTHON")
+if _build_python:
+    _source_python = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    sys.path.insert(0, _source_python)
+    sys.path.insert(0, _build_python)
+
+import pymlir
+import logging
+
+from llm.log_config import setup_logging
+
+
+def parse_max_pixels(value):
+    """
+    Parse a "width,height" string and return [width, height].
+    """
+    if ',' not in value:
+        raise argparse.ArgumentTypeError(
+            "The input must be two integers separated by a comma, e.g., 672,896")
+    parts = value.split(',')
+    if len(parts) != 2:
+        raise argparse.ArgumentTypeError(
+            "The input must be two integers separated by a comma, e.g., 672,896")
+    try:
+        width = int(parts[0].strip())
+        height = int(parts[1].strip())
+    except ValueError:
+        raise argparse.ArgumentTypeError("The input values must be integers, e.g., 672,896")
+    return [width, height]
+
+
+def deprecated_option(cond, msg):
+    if cond:
+        raise RuntimeError(msg)
+
+
+# Dispatch table: model_type(s) -> (module, class, options).
+# Adding a new model = one line here; no if/elif edits.
+#   default_max_shape: per-model fallback when --max_pixels is omitted.
+#   force_dynamic    : flip args.dynamic on (with a notice).
+#   pixel_multiple   : require max_pixels % (m*m) == 0 (early validation).
+LLM_CONVERTERS = [
+    (("qwen3", "qwen2", "llama", "minicpm", "qwen2_moe"), "llm.LlmConverter", "LlmConverter", {}),
+    (("mllama", ), "llm.Llama3_2VConverter", "Llama3_2VConverter", {}),
+    (("chatglm", ), "llm.Chatglm3Converter", "Chatglm3Converter", {}),
+    (("phi3", ), "llm.Phi3Converter", "Phi3Converter", {}),
+    (("qwen2_vl", ), "llm.Qwen2VLConverter", "Qwen2VLConverter", {
+        "pixel_multiple": 28
+    }),
+    (("qwen2_5_vl", ), "llm.Qwen2_5VLConverter", "Qwen2_5VLConverter", {
+        "default_max_shape": (672, 896),
+        "pixel_multiple": 28
+    }),
+    (("qwen3_vl", ), "llm.Qwen3VLConverter", "Qwen3VLConverter", {
+        "pixel_multiple": 32
+    }),
+    (("qwen3_5", "qwen3_5_moe"), "llm.Qwen3_5Converter", "Qwen3_5Converter", {
+        "force_dynamic": True,
+        "pixel_multiple": 32
+    }),
+    (("qwen2_5_omni", ), "llm.Qwen2_5OConverter", "Qwen2_5OConverter", {}),
+    (("qwen3_asr", ), "llm.Qwen3AsrConverter", "Qwen3AsrConverter", {}),
+    (("internvl_chat", ), "llm.InternVL3Converter", "InternVL3Converter", {}),
+    (("gemma3", ), "llm.Gemma3Converter", "Gemma3Converter", {}),
+    (("gemma4", ), "llm.Gemma4Converter", "Gemma4Converter", {}),
+    (("glm4v", ), "llm.GLM4VConverter", "GLM4VConverter", {
+        "pixel_multiple": 28
+    }),
+    (("minicpmv", ), "llm.MiniCPMV4Converter", "MiniCPMV4Converter", {
+        "default_max_shape": (980, 980),
+        "pixel_multiple": 28
+    }),
+    (("minicpmv4_6", ), "llm.MiniCPMV4_6Converter", "MiniCPMV4_6Converter", {
+        "default_max_shape": (448, 448),
+        "pixel_multiple": 56,
+        "force_dynamic": True,
+    }),
+    (("janus", ), "llm.JanusConverter", "JanusConverter", {}),
+    (("paddleocr_vl", ), "llm.PaddleOCRVLConverter", "PaddleOCRVLConverter", {}),
+    (("lfm2_vl", ), "llm.LFM2VLConverter", "LFM2VLConverter", {}),
+    (("locateanything", ), "llm.LocateAnythingConverter", "LocateAnythingConverter", {
+        "default_max_shape": (896, 896),
+        "pixel_multiple": 28,
+    }),
+    (("falcon_perception", ), "llm.FalconPerceptionConverter", "FalconPerceptionConverter", {
+        "default_max_shape": (256, 256),
+        "pixel_multiple": 16,
+    }),
+    (("unlimited-ocr", "unlimitedocr", "deepseek2-ocr", "deepseek2ocr"), "llm.UnlimitedOCRConverter", "UnlimitedOCRConverter", {}),
+]
+
+
+def find_converter_spec(model_type):
+    for types, module, cls, opts in LLM_CONVERTERS:
+        if model_type in types:
+            return module, cls, opts
+    raise RuntimeError("Unsupported model type: {}".format(model_type))
+
+
+def auto_out_dir(model_path, chip, quantize):
+    base = os.path.basename(os.path.normpath(model_path)).lower()
+    return "./{}_{}_{}".format(base, chip, quantize)
+
+
+if __name__ == '__main__':
+    # yapf: disable
+    parser = argparse.ArgumentParser(description='llm_exporter', formatter_class=argparse.RawTextHelpFormatter)
+    parser.add_argument('-m', '--model_path', type=str, required=True,
+                        help='original weight, like ./Qwen2-7B-Instruct or ./model.gguf')
+    parser.add_argument('--mmproj', type=str, default=None,
+                        help='path to mmproj GGUF file for vision models. '
+                             'If not set and the model is a VLM GGUF, auto-discover mmproj*.gguf '
+                             'in the same directory as the model GGUF file.')
+    parser.add_argument('-s', '--seq_length', type=int, required=True,
+                        help="sequence length")
+    parser.add_argument('-q', '--quantize', type=str, default="auto",
+                        choices=["auto", "bf16", "w8bf16", "w4bf16", "f16", "w8f16", "w4f16", "f32"],
+                        help="quantize type for bmodel")
+    parser.add_argument('-g', "--q_group_size", default=64, type=int,
+                        help="group size for per-group quant, only used in quant mode")
+    parser.add_argument('-c', '--chip', "--processor", type=str, default="bm1684x",
+                        choices=["bm1684x", "bm1688", "cv186x", "bm1690", "bm1684x2"],
+                        help="chip type for bmodel")
+    parser.add_argument('--num_device', type=int, default=1,
+                        help="num device for bmodel")
+    parser.add_argument('--distribute_strategy', type=str, default="tp",
+                        choices=["tp", "pp"],
+                        help="distribute strategy for bmodel, only used when num_device > 1")
+    parser.add_argument('--num_core', type=int, default=0, help="num cores for bmodel")
+    parser.add_argument('-b', '--batch', type=int, default=1,
+                        help='batch size for bmodel')
+    parser.add_argument('--lora_max_rank', type=int, default=0, help="lora rank, default is 0 means no lora")
+    parser.add_argument('--symmetric', action='store_true', help='do symmetric quantize')
+    parser.add_argument('--embedding_disk', action='store_true',
+                        help='export embedding as bin file and inference by cpu')
+    parser.add_argument('--do_sample', action='store_true',
+                        help='Add sample head and separate greedy head from lmhead')
+    parser.add_argument('--speculative_mode',
+                        choices=['none', 'fast', 'strict', 'transactional'],
+                        default='none',
+                        help='export Qwen3.5 speculative verification networks')
+    parser.add_argument('--speculative_length', type=int, default=0,
+                        help='maximum speculative verification length (1..16); '
+                             'requires --use_history_kv when speculative_mode is not none')
+    parser.add_argument('--speculative_overlay', action='store_true',
+                        help='compile only speculative verifier networks for '
+                             'combining with an existing history-KV bmodel')
+    parser.add_argument('--use_history_kv',"--use_block_with_kv", action='store_true',
+                        help='reuse history KV cache during prefill, default is False')
+    parser.add_argument('--max_input_length', type=int, default=0,
+                        help='max input length for prefill, default 0 means the same as seq_length. '
+                             'Cannot be set together with --use_history_kv, where it is derived from '
+                             '--chunk_length instead.')
+    parser.add_argument('--chunk_length', type=int, default=0,
+                        help='chunk length for prefill(with_kv) and decode. default 0 means no decode '
+                             'chunking; with --use_history_kv it defaults to seq_length // 4.')
+    parser.add_argument('--max_pixels', type=parse_max_pixels, default=None,
+                        help="max pixels for vit as 'width,height', e.g. 672,896. "
+                             "If unset, defaults are picked by model_type: "
+                             "qwen2_5_vl -> 672,896, minicpmv -> 980,980, others -> 768,768.")
+    parser.add_argument('--text_only', action='store_true',
+                        help='omit the vision encoder from multimodal bmodels; '
+                             'text embedding and generation remain available')
+    parser.add_argument('--audio_length', type=int, default=0,
+                        help='audio sequence length for audio bmodel')
+    parser.add_argument('--dynamic', action='store_true',
+                        help='enable dynamic compiling for llm prefill')
+    parser.add_argument('--debug', action='store_true',
+                        help='enable debug mode, temp files will not be deleted')
+    parser.add_argument('--only_mlir', action='store_true', help='only export mlir file, do not convert to bmodel')
+    parser.add_argument('--rvti', action='store_true',
+                        help='enable rvti, only for bm1684x2 and bm1690e')
+    parser.add_argument("--again", action='store_true',
+                        help='resume an interrupted conversion: skip stages whose '
+                             'outputs already exist in --out_dir.')
+    parser.add_argument('--dry_run', action='store_true',
+                        help='resolve the configuration, print it, and exit without '
+                             'invoking the converter')
+    parser.add_argument("-V", "--version", action='version', version='%(prog)s ' + pymlir.__version__)
+    parser.add_argument('-o', '--out_dir', type=str, default=None,
+                        help='output mlir/bmodel path. If unset, defaults to '
+                             './<model_name>_<chip>_<quantize>')
+    #========== DEPRECATED Options ==============
+    parser.add_argument("--dynamic_vit", action='store_true',
+                        help='enable dynamic compiling for vit')
+    parser.add_argument('--input_length_list', action="store_true",
+                        help="a list of input lengths separated by '+', each input length can be a single integer")
+    args = parser.parse_args()
+    setup_logging(debug=args.debug)
+    deprecated_option(args.dynamic_vit, "DEPRECATED,default is dynamic compiling")
+    deprecated_option(args.input_length_list, "DEPRECATED, please use --dynamic to enable dynamic compiling")
+    # yapf: enable
+    if args.seq_length <= 0:
+        raise ValueError("seq_length must be positive, got: {}".format(args.seq_length))
+    if args.speculative_mode != 'none':
+        if not args.use_history_kv:
+            raise ValueError("speculative verification requires --use_history_kv")
+        if not 1 <= args.speculative_length <= 16:
+            raise ValueError("speculative_length must be in [1, 16], got: {}".format(
+                args.speculative_length))
+    elif args.speculative_length != 0:
+        raise ValueError(
+            "speculative_length requires --speculative_mode fast, strict, or transactional")
+    if args.speculative_overlay and args.speculative_mode == 'none':
+        raise ValueError("speculative_overlay requires speculative_mode fast or strict")
+    if args.speculative_overlay and args.speculative_mode == 'transactional':
+        raise ValueError("transactional mode requires one complete build; overlay is forbidden")
+    if args.use_history_kv:
+        args.dynamic = True
+        if args.chunk_length <= 0:
+            args.chunk_length = args.seq_length // 4
+            print(
+                "Warning: chunk_length is not set, use seq_length // 4 as default value: {}".format(
+                    args.chunk_length))
+        if args.chunk_length <= 0:
+            raise ValueError(
+                "chunk_length must be positive under --use_history_kv, but seq_length // 4 = 0; "
+                "set --chunk_length explicitly or use a larger --seq_length, got: {}".format(
+                    args.chunk_length))
+        if args.max_input_length <= 0:
+            args.max_input_length = args.chunk_length
+        else:
+            raise ValueError(
+                "max_input_length should not be set when --use_history_kv is enabled, got: {}".
+                format(args.max_input_length))
+
+    if args.chunk_length > args.seq_length // 2:
+        raise ValueError("chunk_length should not be larger than seq_length // 2, got: {}".format(
+            args.chunk_length))
+
+    # Resolve out_dir before loading the model so --dry_run is fast.
+    if args.out_dir is None:
+        args.out_dir = auto_out_dir(args.model_path, args.chip, args.quantize)
+        print("Info: --out_dir not set, using '{}'".format(args.out_dir))
+
+    is_gguf = os.path.isfile(args.model_path) and args.model_path.lower().endswith('.gguf')
+
+    mmproj_path = None
+
+    if is_gguf:
+        from llm.ModelHandle import GGUFModelHandle, create_gguf_config
+
+        print("Detected GGUF model: {}".format(args.model_path))
+        loader = GGUFModelHandle(args.model_path, args=args)
+        reader = loader.model.reader
+        arch_field = reader.get_field("general.architecture")
+        architecture = arch_field.contents() if arch_field else "qwen3"
+        print("GGUF model architecture: {}".format(architecture))
+        model_type = GGUFModelHandle.ARCH_TO_MODEL_TYPE.get(architecture, architecture)
+
+        tags_field = reader.fields.get("general.tags")
+        if tags_field is not None:
+            try:
+                tags = tags_field.contents()
+                if isinstance(tags, list) and "internvl" in tags:
+                    model_type = "internvl_chat"
+                    print(
+                        "Detected InternVL3 model (via general.tags), override model_type to internvl_chat"
+                    )
+            except Exception:
+                pass
+
+        if model_type in GGUFModelHandle.VLM_ARCHS or architecture in GGUFModelHandle.VLM_ARCHS:
+            if args.mmproj:
+                mmproj_path = args.mmproj
+            else:
+                model_dir = os.path.dirname(os.path.abspath(args.model_path))
+                candidates = [
+                    f for f in os.listdir(model_dir)
+                    if f.lower().startswith("mmproj") and f.lower().endswith(".gguf")
+                ]
+                if len(candidates) == 1:
+                    mmproj_path = os.path.join(model_dir, candidates[0])
+                    print("Auto-discovered mmproj GGUF: {}".format(mmproj_path))
+                elif len(candidates) > 1:
+                    raise RuntimeError("Multiple mmproj GGUF files found in '{}': {}. "
+                                       "Please specify one with --mmproj.".format(
+                                           model_dir, candidates))
+                else:
+                    raise RuntimeError(
+                        "VLM GGUF model detected (arch={}) but no mmproj GGUF found in '{}'. "
+                        "Please provide one with --mmproj.".format(architecture, model_dir))
+
+            print("Using mmproj GGUF: {}".format(mmproj_path))
+            loader.load_mmproj(mmproj_path)
+            mmproj_reader = loader.model.mmproj_reader
+            config = create_gguf_config(reader,
+                                        args.quantize,
+                                        args.seq_length,
+                                        mmproj_reader=mmproj_reader)
+        else:
+            config = create_gguf_config(reader, args.quantize, args.seq_length)
+    else:
+        from llm.transformers_compat import load_auto_config
+        from llm.ModelHandle import SafetensorsModelHandle
+
+        _path_lower = args.model_path.lower()
+        if "qwen" in _path_lower and "asr" in _path_lower:
+            import qwen_asr  # noqa: F401
+        try:
+            config = load_auto_config(args.model_path, trust_remote_code=True)
+        except Exception as e:
+            raise RuntimeError("Failed to load model config from '{}': {}\n"
+                               "Hint: check that the directory contains a valid "
+                               "config.json.".format(args.model_path, e)) from e
+        loader = SafetensorsModelHandle(args.model_path)
+        model_type = config.model_type
+
+    module_name, class_name, opts = find_converter_spec(model_type)
+
+    if args.max_pixels is None:
+        default_shape = opts.get("default_max_shape", (768, 768))
+        args.max_shape = [int(default_shape[0]), int(default_shape[1])]
+    else:
+        args.max_shape = list(args.max_pixels)
+    args.max_pixels = args.max_shape[0] * args.max_shape[1]
+
+    pixel_multiple = opts.get("pixel_multiple")
+    if pixel_multiple and args.max_pixels % (pixel_multiple * pixel_multiple) != 0:
+        raise ValueError(
+            "max_pixels (={}, from {}x{}) must be a multiple of {}*{} for model_type '{}'.".format(
+                args.max_pixels, args.max_shape[0], args.max_shape[1], pixel_multiple,
+                pixel_multiple, model_type))
+
+    if opts.get("force_dynamic") and not args.dynamic:
+        print("Info: forcing --dynamic for model_type '{}'".format(model_type))
+        args.dynamic = True
+
+    if args.dry_run:
+        print("=== llm_convert dry-run ===")
+        for k in ("model_path", "model_type:" + model_type, "out_dir", "chip", "quantize",
+                  "seq_length", "max_input_length", "max_shape", "max_pixels", "num_device",
+                  "distribute_strategy", "num_core", "batch", "dynamic", "embedding_disk",
+                  "do_sample", "use_history_kv", "speculative_mode",
+                  "speculative_length", "speculative_overlay", "lora_max_rank", "symmetric"):
+            if ":" in k:
+                key, value = k.split(":", 1)
+                print("  {:<22} = {}".format(key, value))
+            else:
+                print("  {:<22} = {}".format(k, getattr(args, k)))
+        print("  converter             = {}.{}".format(module_name, class_name))
+        import sys
+        sys.exit(0)
+
+    module = importlib.import_module(module_name)
+    converter_cls = getattr(module, class_name)
+    converter = converter_cls(args, config, loader=loader)
+    converter.run()

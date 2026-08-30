@@ -1,0 +1,134 @@
+[router]
+host = "0.0.0.0"
+port = 8000
+
+[[servers]]
+name = "qwen3-5-history"
+display_name = "qwen3.5-4b-history"
+type = "chat"
+backend = "local"
+host = "127.0.0.1"
+port = 8007
+model_path = "../qwen3.5history/qwen3.5_4b_w4bf16_seq8192_bm1684x_1dev_history_without_vit_dynamic_20260816_214532.bmodel"
+config_path = "../qwen3.5history/config"
+module_path = "../qwen3.5history/demo/python_demo"
+devid = 0
+video_ratio = 0.25
+max_new_tokens = 512
+max_sessions = 4
+max_snapshot_bytes = 1073741824
+server_script = "qwen3_5_history_server.py"
+exclusive_group = "qwen3-5-chat"
+startup = false
+
+[[servers]]
+name = "qwen3-5"
+display_name = "qwen3.5"
+type = "chat"
+backend = "local"
+host = "127.0.0.1"
+port = 8001
+model_path = "../Qwen3_5/qwen3.5.bmodel"
+config_path = "../Qwen3_5/config"
+module_path = "../Qwen3_5/python_demo"
+devid = 0
+video_ratio = 0.25
+server_script = "qwen3_5_server.py"
+exclusive_group = "qwen3-5-chat"
+startup = false
+
+[[servers]]
+name = "deepseek-v4-flash"
+display_name = "deepseek-v4-flash"
+type = "chat"
+backend = "openai"
+provider = "deepseek"
+base_url = "https://api.deepseek.com"
+upstream_model = "deepseek-v4-flash"
+api_key_env = "DEEPSEEK_API_KEY"
+enabled = true
+thinking = "enabled"
+reasoning_effort = "medium"
+connect_timeout = 10.0
+read_timeout = 300.0
+max_retries = 2
+# DeepSeek upstream KV-cache/scheduling lanes for prompt drafting.  This is
+# user_id (not the local Agent x-session-id); histories must never be shared.
+prompt_cache_user_ids = []
+
+[[servers]]
+name = "deepseek-v4-pro"
+display_name = "deepseek-v4-pro"
+type = "chat"
+backend = "openai"
+provider = "deepseek"
+base_url = "https://api.deepseek.com"
+upstream_model = "deepseek-v4-pro"
+api_key_env = "DEEPSEEK_API_KEY"
+enabled = true
+thinking = "enabled"
+reasoning_effort = "high"
+connect_timeout = 10.0
+read_timeout = 300.0
+max_retries = 2
+# Keep the same bounded lanes for V4 Pro review/drafting when the router is
+# used.  Exact-prefix matching is still provider-controlled and best-effort.
+prompt_cache_user_ids = []
+
+[[servers]]
+name = "qwen3-embedding"
+display_name = "qwen3-embedding-0.6b"
+type = "embedding"
+backend = "local"
+host = "127.0.0.1"
+port = 8006
+model_path = "../Qwen3_embedding_0.6B/qwen3_embedding_w4bf16_bm1684x_seq512/model/qwen3_embedding_bf16_seq512_bm1684x.bmodel"
+config_path = "../Qwen3_embedding_0.6B/qwen3_embedding_w4bf16_bm1684x_seq512/tokenizer"
+module_path = "../Qwen3_embedding_0.6B/qwen3_embedding_w4bf16_bm1684x_seq512"
+devid = 0
+server_script = "qwen3_embedding_server.py"
+# 医疗检索启用 dense+sparse 融合；常驻加载 Qwen3 Embedding。
+startup = true
+
+[[servers]]
+name = "qwen3-asr"
+display_name = "qwen3-asr"
+type = "audio"
+backend = "local"
+host = "127.0.0.1"
+port = 8003
+model_path = "../Qwen3_ASR/qwen3_asr.bmodel"
+config_path = "../Qwen3_ASR/config"
+module_path = "../Qwen3_ASR/python_demo"
+devid = 0
+server_script = "qwen3_asr_server.py"
+startup = true
+
+[[servers]]
+name = "sherpa-kws"
+display_name = "sherpa-kws"
+type = "kws"
+backend = "local"
+host = "127.0.0.1"
+port = 8004
+model_path = "../sherpa-onnx-kws-zipformer-zh-en-3M/kws_transducer_chunk16_bm1684x_f32.bmodel"
+config_path = "../sherpa-onnx-kws-zipformer-zh-en-3M/runtime"
+module_path = "../sherpa-onnx-kws-zipformer-zh-en-3M"
+devid = 0
+server_script = "../sherpa-onnx-kws-zipformer-zh-en-3M/sherpa_kws_server.py"
+startup = true
+
+[[servers]]
+name = "vits-melo-tts"
+display_name = "vits-melo-tts"
+type = "tts"
+backend = "local"
+host = "127.0.0.1"
+port = 8005
+model_path = "../vits-melo-tts-zh_en"
+config_path = "../vits-melo-tts-zh_en/preprocess_assets"
+module_path = "../vits-melo-tts-zh_en"
+devid = 0
+max_input_tokens = 50
+server_script = "vits_tts_server.py"
+startup = true

@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Voice Agent 调试台</title>
+  <style>
+    :root{color-scheme:dark;--bg:#0b1020;--card:#151d31;--line:#2a3856;--text:#eaf0ff;--muted:#9aaccc;--brand:#7db3ff;--ok:#55d6a2;--bad:#ff8894;--warn:#ffcf70}
+    *{box-sizing:border-box}body{margin:0;background:linear-gradient(140deg,#0a1020,#101a2e);color:var(--text);font:14px Inter,"PingFang SC","Microsoft YaHei",sans-serif}button,input,select,textarea{font:inherit}button{cursor:pointer;border:1px solid var(--line);color:var(--text);background:#1b2945;border-radius:8px;padding:8px 11px}button.primary{background:#2769c7;border-color:#4389ec}button.danger{color:#ffc0c7}button:disabled{opacity:.5;cursor:not-allowed}input,select,textarea{width:100%;background:#0e1628;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:9px}textarea{resize:vertical;min-height:78px;line-height:1.55}.top{padding:18px max(20px,calc((100vw - 1280px)/2));border-bottom:1px solid var(--line);display:flex;gap:16px;align-items:center;background:#10182bdd;position:sticky;top:0;z-index:2}.top h1{font-size:18px;margin:0}.top p{margin:3px 0 0;color:var(--muted);font-size:12px}.state{margin-left:auto;font-size:12px;color:var(--muted)}.dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--bad);margin-right:6px}.dot.ok{background:var(--ok);box-shadow:0 0 9px var(--ok)}main{max-width:1280px;margin:auto;padding:20px;display:grid;grid-template-columns:1.55fr 1fr;gap:18px}.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;min-width:0}.card h2{font-size:15px;margin:0 0 12px}.hint{color:var(--muted);font-size:12px;line-height:1.5}.row{display:flex;gap:9px;align-items:center}.row>*{min-width:0}.grow{flex:1}.stack{display:grid;gap:10px}.chat{height:385px;overflow:auto;padding:6px 2px;display:grid;align-content:start;gap:10px}.message{padding:10px 12px;border-radius:10px;background:#10192b;white-space:pre-wrap;word-break:break-word;line-height:1.55}.message.user{border-left:3px solid var(--brand)}.message.assistant{border-left:3px solid var(--ok)}.message.tool{border-left:3px solid var(--warn);font-size:12px}.meta{font-size:11px;color:var(--muted);margin-bottom:4px}.status-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.model{border:1px solid var(--line);padding:9px;border-radius:8px;font-size:12px}.model b{display:block;margin-bottom:4px}.online{color:var(--ok)}.offline,.unavailable,.invalid_credentials{color:var(--bad)}.loading,.checking{color:var(--warn)}pre{white-space:pre-wrap;word-break:break-word;background:#0c1424;border:1px solid var(--line);border-radius:8px;padding:10px;max-height:210px;overflow:auto;margin:0;font-size:12px}.trace-list{display:flex;flex-direction:column;gap:10px;padding:8px;background:#0b1220;border:1px solid #24324d;border-radius:14px}.trace-turn{display:flex;flex-direction:column;gap:10px;min-width:0}.trace-title{align-self:center;font-size:11px;color:#c8d4e9;background:#1c2940;border:1px solid #34496b;border-radius:999px;padding:5px 10px;margin-bottom:2px}.trace-bubble{position:relative;width:fit-content;max-width:88%;border:1px solid var(--line);border-radius:4px 15px 15px 15px;padding:10px 13px;white-space:pre-wrap;word-break:break-word;font-size:13px;line-height:1.6;background:#162034;box-shadow:0 5px 16px #0002}.trace-bubble .meta{font-weight:750;font-size:11px;margin-bottom:6px}.trace-bubble.user,.trace-bubble.final{align-self:flex-end;border-radius:15px 4px 15px 15px}.trace-bubble.user{background:#1d5b9f;border-color:#438de0;color:#fff}.trace-bubble.model{align-self:flex-start;border-color:#52688f}.trace-bubble.tool{align-self:flex-start;background:#382c16;border-color:#b98b32}.trace-bubble.success{align-self:flex-start;background:#123c2d;border-color:#3ca778}.trace-bubble.error{align-self:flex-start;background:#48202b;border-color:#d55a6d}.trace-bubble.final{background:#176044;border-color:#55d6a2;color:#fff}.trace-empty{color:var(--muted);text-align:center;padding:28px 10px}.record-signal{margin:11px 0 2px;border:1px solid var(--line);border-radius:9px;padding:11px;text-align:center;font-weight:700;color:var(--muted);background:#0c1424}.record-signal.active{background:#421c29;border-color:#e96d80;color:#ffd7dc;animation:pulse 1.15s ease-in-out infinite}.record-signal.done{background:#152f28;border-color:#55d6a2;color:#c8ffe8}@keyframes pulse{50%{box-shadow:0 0 0 5px #e96d8033}}.wide{grid-column:1/-1}.voice-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.voice-value{min-height:42px;background:#0c1424;border:1px solid var(--line);border-radius:8px;padding:8px;white-space:pre-wrap;word-break:break-word}.voice-log{height:180px}@media(max-width:850px){main{grid-template-columns:1fr}.wide{grid-column:auto}.top{padding:15px}.state{display:none}.trace-bubble{max-width:95%}}
+  </style>
+</head>
+<body>
+  <header class="top"><div><h1>Voice Agent 调试台</h1><p>真实 Agent 会话 · 模型 Router · ASR / TTS · 执行轨迹</p></div><div class="state"><span class="dot" id="dot"></span><span id="connection">连接中</span></div></header>
+  <main>
+    <section class="card">
+      <h2>Agent 对话</h2>
+      <div class="row"><select id="sessions" class="grow" aria-label="Agent 会话"></select><button id="newSession">新建会话</button><button id="deleteSession" class="danger">删除</button></div>
+      <div class="chat" id="agentChat" aria-live="polite"></div>
+      <div class="stack"><input type="file" id="agentImage" accept="image/*"><textarea id="agentInput" placeholder="输入任务并发送给当前 Voice Agent；会沿用该会话的历史与工具状态。"></textarea><div class="row"><span class="hint grow" id="agentHint">准备中</span><button id="sendAgent" class="primary">发送 Agent ↵</button></div></div>
+    </section>
+    <aside class="stack">
+      <section class="card"><h2>服务状态</h2><div class="status-grid" id="models"><span class="hint">正在读取 Router…</span></div><p class="hint">模型加载、卸载仍由现有服务管理脚本负责；此页面只发送调试请求。</p></section>
+      <section class="card"><h2>执行轨迹 · 气泡视图 v2</h2><p class="hint">仅显示当前最新一轮。蓝色为用户，灰色为模型决策，黄色为工具调用，绿色或红色为工具结果；不展示或推断隐藏思维链。</p><div id="traces" class="trace-list">正在读取…</div></section>
+    </aside>
+    <section class="card">
+      <h2>模型接口调试</h2>
+      <div class="stack"><div class="row"><select id="chatModel" class="grow" aria-label="聊天模型"></select><button id="sendModel">调用 /chat/completions</button></div><textarea id="modelInput" placeholder="直接调用 Router 的模型接口（不经过 Agent 编排）。"></textarea><pre id="modelOutput">等待请求</pre></div>
+    </section>
+    <section class="card">
+      <h2>语音接口调试</h2>
+      <div class="stack"><div class="row"><select id="audioModel" class="grow" aria-label="ASR 模型"></select><input type="file" id="audioFile" accept="audio/*"><button id="transcribe">转写文件</button></div><div class="row"><button id="record">开始录音</button><span id="recordingHint" class="hint grow">浏览器会录制为 WebM 并发送给 /audio/transcriptions。</span></div><pre id="asrOutput">等待音频</pre><div class="row"><input id="ttsInput" class="grow" placeholder="输入文字，使用现有 TTS 服务合成"><button id="speak">调用 TTS</button></div><audio id="audioPlayer" controls></audio></div>
+    </section>
+    <section class="card wide" id="voiceLab">
+      <h2>远程语音 Agent 全链路</h2>
+      <p class="hint">此面板作为标准 <code>remote-audio.v1</code> 设备连接现有 <code>/ws</code>：持续发送 16 kHz PCM 进行热词监听；命中“小麦”后由服务端发起录音、Qwen ASR、Agent 工具执行和 TTS 回放。Chrome 通过 HTTP 局域网地址通常不能使用麦克风；录音测试需要 HTTPS 或 localhost。</p>
+      <div class="row"><button id="voiceConnect" class="primary">连接语音设备</button><button id="voiceListen" disabled>开始热词监听</button><input id="voiceFixture" type="file" accept="audio/*" class="grow"><button id="voiceFixturePlay" disabled>回放测试音频</button><button id="voiceStop" disabled>停止并断开</button></div><p class="hint" id="voiceSecureHint"></p><div class="record-signal" id="voiceRecordSignal" role="status" aria-live="assertive">等待热词；命中“小麦”后才会开始录音</div>
+      <div class="voice-grid" style="margin-top:12px"><div><div class="meta">协议 / 状态</div><div class="voice-value" id="voiceState">未连接</div></div><div><div class="meta">热词识别</div><div class="voice-value" id="voiceHotword">等待监听</div></div><div><div class="meta">Qwen ASR 结果</div><div class="voice-value" id="voiceAsr">—</div></div><div><div class="meta">TTS / 播放文本</div><div class="voice-value" id="voiceTts">—</div></div><div class="wide"><div class="meta">Agent 最终输出</div><div class="voice-value" id="voiceAgent">—</div></div></div>
+      <div class="meta" style="margin-top:12px">协议事件日志</div><pre class="voice-log" id="voiceLog">尚未连接</pre>
+    </section>
+    <section class="card wide"><h2>本次 Agent 调用摘要 · 气泡视图 v2</h2><p class="hint">只展示从网页文本输入发起的本次调用；下一次发送时会清空并替换，不与语音轨迹或上一次调用混合。</p><div id="agentDebug" class="trace-list"><div class="trace-empty">等待 Agent 调用</div></div></section>
+  </main>
+<script>
+(() => {
+  window.__agentDebugModern = true;
+  const reportClientError = (message, source='', line='', column='') => {
+    try {
+      fetch('/v1/debug/client-errors', {
+        method:'POST', headers:{'content-type':'application/json'},
+        body:JSON.stringify({message:String(message||''),source:String(source||''),line,column}),
+      }).catch(()=>{});
+    } catch (_) {}
+  };
+  window.onerror = (message, source, line, column) => reportClientError(message, source, line, column);
+  window.onunhandledrejection = event => reportClientError(
+    event && event.reason && event.reason.message ? event.reason.message : event.reason,
+    'unhandledrejection'
+  );
+  document.getElementById('connection').textContent = '浏览器脚本已启动，正在连接服务';
+  const $=id=>document.getElementById(id); let currentSession=''; let recorder, recorded=[]; let traceBarrier=0;
+  const api=(path, options={})=>{const request={cache:'no-store'};Object.keys(options).forEach(key=>{request[key]=options[key]});return fetch(path,request).then(async r=>{const data=await r.json().catch(()=>({error:{message:'服务返回了非 JSON 内容'}}));if(!r.ok)throw new Error((data.error&&data.error.message)||`HTTP ${r.status}`);return data})};
+  const router=(path, options={})=>api('/v1/debug/router/'+path,options);
+  const text=v=>v==null?'':String(v); const json=v=>JSON.stringify(v,null,2);
+  function show(el, value){$(el).textContent=typeof value==='string'?value:json(value)}
+  function clear(el){while(el.firstChild)el.removeChild(el.firstChild)}
+  function readable(value){if(typeof value!=='string')return text(value);try{return JSON.stringify(JSON.parse(value),null,2)}catch(_){return value}}
+  function humanValue(value, depth=0){if(value==null||value==='')return '无';if(depth>3)return '（内容层级较深，已省略）';if(typeof value==='string'){try{return humanValue(JSON.parse(value),depth+1)}catch(_){return value}}if(Array.isArray(value))return value.length?value.map((item,index)=>`${index+1}. ${humanValue(item,depth+1)}`).join('\n'):'无';if(typeof value==='object'){const labels={goal:'目标',goal_description:'目标',done_when:'完成条件',step_id:'步骤',steps:'步骤',tool:'工具',action_type:'动作',arguments:'参数',question:'问题',plan_id:'计划编号',revision:'版本',success_conditions:'成功条件',result:'结果'};return Object.entries(value).map(([key,item])=>`${labels[key]||key}：${humanValue(item,depth+1)}`).join('\n')}return text(value)}
+  function parsedModelOutput(raw){const source=String(raw||'').trim();const found=source.match(/<tool>\s*([\s\S]*?)\s*<\/tool>/i);if(!found)return source||'（模型没有输出文字）';try{const call=JSON.parse(found[1]);const name=call.tool_call||call.name||'未知命令';const param=call.param||call.params||{};if(name==='plan')return `生成执行计划\n目标：${text(param.goal||'—')}\n完成条件：${text(param.done_when||'—')}\n步骤：${humanValue(param.steps||[])}`;if(name==='act'){const action=text(param.action_type||'—');if(action==='FINISH')return `准备结束本轮\n回复：${text(param.response||'—')}`;return `决定执行动作\n动作：${action}\n工具：${text(param.tool||'—')}\n参数：${humanValue(param.arguments||{})}`;}return `请求执行 ${name}\n${humanValue(param)}`}catch(_){return source.replace(/<\/?tool>/gi,'').trim()||'（模型输出无法解析）'}}
+  function timingText(d){if(!d||!d.schema_version)return '';const s=d.stages||{},r=d.retrieval||{};const rows=[`总耗时：${Number(d.total_ms||0).toFixed(1)} ms`];if(s.retriever_prepare_ms!=null)rows.push(`索引准备：${Number(s.retriever_prepare_ms).toFixed(1)} ms`);if(s.consult_ms!=null)rows.push(`医疗检索：${Number(s.consult_ms).toFixed(1)} ms`);if(r.parallel_total_ms!=null)rows.push(`并行检索分支：${Number(r.parallel_total_ms).toFixed(1)} ms`);if(r.mode)rows.push(`检索模式：${text(r.mode)}${r.dense_used?'（含向量检索）':''}`);return '\n\n阶段耗时\n'+rows.join('\n')}
+  function traceEvent(event){const p=event.payload||{};if(event.type==='turn_start')return ['你',text(p.prompt||'—'),'user'];if(event.type==='harness_state'&&p.event==='AGENT_WORKFLOW_ATTACHED'){const s=p.state||{};return ['执行计划',`目标：${text(s.goal||'—')}\n步骤：${humanValue(s.remaining_steps||[])}`,'model'];}if(event.type==='model_output')return [`模型决策 · 第 ${text(p.iteration||'?')} 次`,parsedModelOutput(p.text),'model'];if(event.type==='tool_call')return [`调用工具 · ${text(p.name||'未知')}`,Object.keys(p.params||{}).length?humanValue(p.params):'无需参数','tool'];if(event.type==='tool_result')return [`${p.success?'✓ 工具执行成功':'✕ 工具执行失败'} · ${text(p.name||'未知')}`,humanValue(p.success?p.data:(p.error||p.data||'无返回内容'))+timingText(p.diagnostics),p.success?'success':'error'];if(event.type==='final_output')return ['Agent',text(p.text||'—'),'final'];if(event.type==='policy')return ['策略提示',text(p.message||'—'),'error'];if(event.type==='error')return ['执行错误',text(p.message||p.error||'未知错误'),'error'];return null;}
+  function appendBubble(host,name,body,kind){const item=document.createElement('article');item.className='trace-bubble '+kind;const label=document.createElement('div');label.className='meta';label.textContent=name;const content=document.createElement('div');content.textContent=body;item.append(label,content);host.appendChild(item)}
+  function traceWaiting(message){const host=$('traces');clear(host);const empty=document.createElement('div');empty.className='trace-empty';empty.textContent=message;host.appendChild(empty)}
+  function renderTraces(traces){const list=Array.isArray(traces)?traces:[];const trace=list.length?list[list.length-1]:null;if(!trace){traceWaiting('尚无执行轨迹');return;}if(traceBarrier&&Number(trace.created_at||0)<traceBarrier){traceWaiting('热词已命中，等待本次语音 Agent 执行…');return;}traceBarrier=0;const host=$('traces');clear(host);const box=document.createElement('section');box.className='trace-turn';const title=document.createElement('div');title.className='trace-title';title.textContent=`${trace.status==='completed'?'✓ 已完成':trace.status==='error'?'✕ 执行失败':'● 执行中'} · ${text(trace.mode||'Agent')} · 仅显示最新一轮`;box.appendChild(title);(trace.events||[]).forEach(event=>{const item=traceEvent(event);if(item)appendBubble(box,item[0],item[1],item[2])});if(box.children.length===1)appendBubble(box,'Agent','等待下一步事件…','model');host.appendChild(box);}
+  window.resetTraceForHotword=()=>{traceBarrier=Date.now()/1000;traceWaiting('热词已命中，等待本次语音 Agent 执行…');};
+  function renderPromptResult(prompt,result){const host=$('agentDebug');clear(host);const box=document.createElement('section');box.className='trace-turn';appendBubble(box,'你',prompt,'user');(Array.isArray(result.commands)?result.commands:[]).forEach(command=>{appendBubble(box,`调用工具 · ${text(command.name||command.tool||'未知')}`,humanValue(command.params||command.arguments||{})||'无需参数','tool');appendBubble(box,`${command.success?'✓ 工具执行成功':'✕ 工具执行失败'} · ${text(command.name||command.tool||'未知')}`,humanValue(command.success?command.data:(command.error||command.data||'无返回内容')),command.success?'success':'error')});appendBubble(box,'Agent',text(result.text||result.output||result.response||'（Agent 未返回文字）'),'final');host.appendChild(box);host.scrollTop=host.scrollHeight;}
+  function setConnection(ok, value){$('dot').className=ok?'dot ok':'dot';$('connection').textContent=value}
+  function setRecordSignal(value, state=''){const el=$('voiceRecordSignal');el.textContent=value;el.className='record-signal '+state;}
+  function message(role, content, extra=''){const d=document.createElement('article');d.className='message '+role;const m=document.createElement('div');m.className='meta';m.textContent=extra||({user:'用户',assistant:'Agent',tool:'工具'}[role]||role);const c=document.createElement('div');c.textContent=text(content);d.appendChild(m);d.appendChild(c);$('agentChat').appendChild(d);$('agentChat').scrollTop=$('agentChat').scrollHeight}
+  async function refreshSessions(selectLast=false){const data=await api('/v1/agent/sessions');const list=data.data||[];const select=$('sessions');clear(select);list.forEach(s=>{const o=new Option(`${s.id} · ${s.message_count} 条消息`,s.id);select.add(o)});if(selectLast&&list.length)currentSession=list[list.length-1].id;if(!list.some(s=>s.id===currentSession))currentSession=list.length?list[0].id:'';select.value=currentSession;$('agentHint').textContent=currentSession?`会话 ${currentSession} 已选中`:'尚无会话';await loadHistory()}
+  async function newSession(){const data=await api('/v1/agent/sessions',{method:'POST',headers:{'content-type':'application/json'},body:'{}'});currentSession=data.id;await refreshSessions();}
+  async function loadHistory(){ clear($('agentChat'));if(!currentSession)return;const data=await api(`/v1/agent/sessions/${encodeURIComponent(currentSession)}/history`);(data.data||[]).forEach(m=>message(m.role==='assistant'?'assistant':'user',m.content,m.source||m.role)); }
+  async function imageData(){const file=$('agentImage').files[0];if(!file)return null;if(file.size>8*1024*1024)throw new Error('图片需小于 8 MB');return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(new Error('图片读取失败'));reader.readAsDataURL(file)})}
+  async function sendAgent(){const input=$('agentInput'), value=input.value.trim();if(!value)return;if(!currentSession)await newSession();const button=$('sendAgent');button.disabled=true;try{const image=await imageData();message('user',value);input.value='';$('agentImage').value='';$('agentHint').textContent='Agent 正在执行…';const result=await api('/v1/agent/prompt',{method:'POST',headers:{'content-type':'application/json'},body:json({session_id:currentSession,text:value,image})});message('assistant',result.text||'（Agent 未返回文字）');(result.commands||[]).forEach(c=>message('tool',`${c.name}: ${c.success?'成功':'失败'}\n${text(c.data||c.error||'无返回内容')}`,c.type));renderPromptResult(value,result);await refreshSessions()}catch(err){message('tool',err.message,'请求失败');$('agentHint').textContent='请求失败'}finally{button.disabled=false}}
+  async function refreshModels(){try{const pair=await Promise.all([router('v1/models'),router('status')]);const all=pair[0].data||[];const modelList=$('models');clear(modelList);all.forEach(m=>{const d=document.createElement('div');d.className='model';const title=document.createElement('b');title.textContent=m.id;const state=document.createElement('span');state.className=m.status||'offline';state.textContent=`${m.type} · ${m.status||'offline'}`;d.appendChild(title);d.appendChild(state);modelList.appendChild(d)});for(const type of ['chat','audio']){const select=$(type==='chat'?'chatModel':'audioModel');clear(select);all.filter(m=>m.type===type).forEach(m=>select.add(new Option(`${m.id} (${m.status})`,m.id)))}renderTraces((await router('v1/agent/traces')).traces||[]);setConnection(true,'Agent 与 Router 已连接')}catch(err){setConnection(false,'Router 不可用：'+err.message);show('traces',err.message)}}
+  async function sendModel(){const content=$('modelInput').value.trim();if(!content)return;const button=$('sendModel');button.disabled=true;show('modelOutput','请求中…');try{const data=await router('v1/chat/completions',{method:'POST',headers:{'content-type':'application/json'},body:json({model:$('chatModel').value,messages:[{role:'user',content}],stream:false)});show('modelOutput',data)}catch(err){show('modelOutput',err.message)}finally{button.disabled=false}}
+  async function transcribe(file){if(!file)return;show('asrOutput','转写中…');try{const form=new FormData();form.append('model',$('audioModel').value);form.append('file',file,file.name||'recording.webm');show('asrOutput',await router('v1/audio/transcriptions',{method:'POST',body:form}))}catch(err){show('asrOutput',err.message)}}
+  async function toggleRecording(){const b=$('record');if(recorder&&recorder.state==='recording'){recorder.stop();b.textContent='开始录音';return}try{const stream=await navigator.mediaDevices.getUserMedia({audio:true});recorded=[];recorder=new MediaRecorder(stream);recorder.ondataavailable=e=>recorded.push(e.data);recorder.onstop=()=>{stream.getTracks().forEach(t=>t.stop());transcribe(new File(recorded,'browser-recording.webm',{type:recorder.mimeType||'audio/webm'}))};recorder.start();b.textContent='停止并转写';$('recordingHint').textContent='录音中…再次点击停止。'}catch(err){$('recordingHint').textContent='无法使用麦克风：'+err.message}}
+  async function speak(){const input=$('ttsInput').value.trim();if(!input)return;try{const data=await router('v1/audio/speech',{method:'POST',headers:{'content-type':'application/json'},body:json({model:'vits-melo-tts',input})});const raw=data.audio||'';if(!raw)throw new Error('TTS 未返回 audio');$('audioPlayer').src='data:audio/wav;base64,'+raw;$('audioPlayer').play().catch(()=>{})}catch(err){alert('TTS 失败：'+err.message)}}
+  $('newSession').onclick=()=>newSession().catch(e=>alert(e.message));$('deleteSession').onclick=async()=>{if(!currentSession||!confirm('删除当前会话？'))return;await api('/v1/agent/sessions/'+encodeURIComponent(currentSession),{method:'DELETE'});currentSession='';await refreshSessions(true)};$('sessions').onchange=e=>{currentSession=e.target.value;loadHistory().catch(err=>message('tool',err.message))};$('sendAgent').onclick=sendAgent;$('agentInput').onkeydown=e=>{if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)){e.preventDefault();sendAgent()}};$('sendModel').onclick=sendModel;$('transcribe').onclick=()=>transcribe($('audioFile').files[0]);$('record').onclick=toggleRecording;$('speak').onclick=speak;
+  (async()=>{try{await refreshSessions(true)}catch(err){$('agentHint').textContent='Agent 会话接口不可用：'+err.message}await refreshModels()})();setInterval(refreshModels,5000);
+})();
+</script>
+<script>
+/* ES5 fallback for legacy Edge / embedded Windows WebView. The modern script
+   above sets the flag before doing any work; a browser that cannot parse it
+   ignores it and executes this implementation instead. */
+(function () {
+  if (window.__agentDebugModern) { return; }
+  var currentSession = '', recorder = null, recorded = [];
+  function $(id) { return document.getElementById(id); }
+  function clear(el) { while (el.firstChild) { el.removeChild(el.firstChild); } }
+  function text(value) { return value == null ? '' : String(value); }
+  function show(id, value) { $(id).textContent = typeof value === 'string' ? value : JSON.stringify(value, null, 2); }
+  function connection(ok, label) { $('dot').className = ok ? 'dot ok' : 'dot'; $('connection').textContent = label; }
+  function parseValue(value) {
+    if (typeof value !== 'string') { return value; }
+    try { return JSON.parse(value); } catch (_) { return value; }
+  }
+  function humanValue(value, depth) {
+    var parsed, keys, lines = [], i, key, item;
+    depth = depth || 0; if (value == null || value === '') { return '无'; }
+    parsed = parseValue(value); if (parsed !== value) { return humanValue(parsed, depth + 1); }
+    if (typeof value === 'string') { return value; }
+    if (depth > 3) { return '（详细内容已省略）'; }
+    if (Object.prototype.toString.call(value) === '[object Array]') {
+      for (i = 0; i < value.length; i++) { lines.push((i + 1) + '. ' + humanValue(value[i], depth + 1)); }
+      return lines.length ? lines.join('\n') : '无';
+    }
+    if (typeof value === 'object') {
+      keys = Object.keys(value); for (i = 0; i < keys.length; i++) { key = keys[i]; item = value[key]; lines.push(key + '：' + humanValue(item, depth + 1)); }
+      return lines.length ? lines.join('\n') : '无';
+    }
+    return text(value);
+  }
+  function modelDecision(raw) {
+    var source = text(raw).replace(/^\s+|\s+$/g, ''), match = source.match(/<tool>\s*([\s\S]*?)\s*<\/tool>/i), call, name, param;
+    if (!match) { return source || '（模型没有输出文字）'; }
+    try {
+      call = JSON.parse(match[1]); name = call.tool_call || call.name || '未知命令'; param = call.param || call.params || {};
+      if (name === 'plan') { return '生成执行计划\n目标：' + text(param.goal || '—') + '\n完成条件：' + text(param.done_when || '—') + '\n步骤：' + humanValue(param.steps || []); }
+      if (name === 'act') { return param.action_type === 'FINISH' ? '准备结束本轮\n回复：' + text(param.response || '—') : '决定执行动作\n动作：' + text(param.action_type || '—') + '\n工具：' + text(param.tool || '—') + '\n参数：' + humanValue(param.arguments || {}); }
+      return '请求执行 ' + name + '\n' + humanValue(param);
+    } catch (_) { return source.replace(/<\/?tool>/gi, '').replace(/^\s+|\s+$/g, ''); }
+  }
+  function addBubble(host, title, body, kind) {
+    var item = document.createElement('article'), meta = document.createElement('div'), content = document.createElement('div');
+    item.className = 'trace-bubble ' + kind; meta.className = 'meta'; meta.textContent = title; content.textContent = body;
+    item.appendChild(meta); item.appendChild(content); host.appendChild(item);
+  }
+  function traceBubble(event) {
+    var p = event.payload || {};
+    if (event.type === 'turn_start') { return ['你', text(p.prompt || '—'), 'user']; }
+    if (event.type === 'model_output') { return ['模型决策 · 第 ' + text(p.iteration || '?') + ' 次', modelDecision(p.text), 'model']; }
+    if (event.type === 'tool_call') { return ['调用工具 · ' + text(p.name || '未知'), humanValue(p.params || {}) || '无需参数', 'tool']; }
+    if (event.type === 'tool_result') { var d = p.diagnostics || {}, s = d.stages || {}, timing = ''; if (d.schema_version) { timing = '\n\n阶段耗时\n总耗时：' + Number(d.total_ms || 0).toFixed(1) + ' ms\n索引准备：' + Number(s.retriever_prepare_ms || 0).toFixed(1) + ' ms\n医疗检索：' + Number(s.consult_ms || 0).toFixed(1) + ' ms'; } return [(p.success ? '✓ 工具执行成功' : '✕ 工具执行失败') + ' · ' + text(p.name || '未知'), humanValue(p.success ? p.data : (p.error || p.data || '无返回内容')) + timing, p.success ? 'success' : 'error']; }
+    if (event.type === 'final_output') { return ['Agent', text(p.text || '—'), 'final']; }
+    if (event.type === 'policy') { return ['策略提示', text(p.message || '—'), 'error']; }
+    if (event.type === 'error') { return ['执行错误', text(p.message || p.error || '未知错误'), 'error']; }
+    return null;
+  }
+  function renderTraces(items) {
+    var host = $('traces'), trace, box, title, events, i, bubble;
+    clear(host); if (!items || !items.length) { host.textContent = '尚无执行轨迹'; return; }
+    trace = items[items.length - 1]; box = document.createElement('section'); box.className = 'trace-turn';
+    title = document.createElement('div'); title.className = 'trace-title'; title.textContent = (trace.status === 'completed' ? '✓ 已完成' : trace.status === 'error' ? '✕ 执行失败' : '● 执行中') + ' · ' + text(trace.mode || 'Agent') + ' · 仅显示最新一轮'; box.appendChild(title);
+    events = trace.events || []; for (i = 0; i < events.length; i++) { bubble = traceBubble(events[i]); if (bubble) { addBubble(box, bubble[0], bubble[1], bubble[2]); } }
+    host.appendChild(box); host.scrollTop = host.scrollHeight;
+  }
+  function renderPromptResult(prompt, data) {
+    var host = $('agentDebug'), box = document.createElement('section'), commands = data.commands || [], i, command;
+    clear(host); box.className = 'trace-turn'; addBubble(box, '你', prompt, 'user');
+    for (i = 0; i < commands.length; i++) { command = commands[i]; addBubble(box, '调用工具 · ' + text(command.name || command.tool || '未知'), humanValue(command.params || command.arguments || {}), 'tool'); addBubble(box, (command.success ? '✓ 工具执行成功' : '✕ 工具执行失败') + ' · ' + text(command.name || command.tool || '未知'), humanValue(command.success ? command.data : (command.error || command.data || '无返回内容')), command.success ? 'success' : 'error'); }
+    addBubble(box, 'Agent', text(data.text || data.output || data.response || '（Agent 未返回文字）'), 'final'); host.appendChild(box); host.scrollTop = host.scrollHeight;
+  }
+  function request(method, path, body, contentType, done) {
+    var xhr = new XMLHttpRequest();
+    xhr.open(method, path, true);
+    if (contentType) { xhr.setRequestHeader('Content-Type', contentType); }
+    xhr.onreadystatechange = function () {
+      var data, error;
+      if (xhr.readyState !== 4) { return; }
+      try { data = JSON.parse(xhr.responseText); } catch (_) { data = {error: {message: '服务返回了非 JSON 内容'}}; }
+      if (xhr.status < 200 || xhr.status >= 300) {
+        error = new Error((data.error && data.error.message) || ('HTTP ' + xhr.status));
+        done(error, data); return;
+      }
+      done(null, data);
+    };
+    xhr.onerror = function () { done(new Error('网络请求失败')); };
+    xhr.send(body || null);
+  }
+  function api(method, path, payload, done) { request(method, path, payload, 'application/json', done); }
+  function router(method, path, payload, contentType, done) { request(method, '/v1/debug/router/' + path, payload, contentType, done); }
+  function addMessage(role, content, extra) {
+    var item = document.createElement('article'), meta = document.createElement('div'), body = document.createElement('div');
+    item.className = 'message ' + role; meta.className = 'meta';
+    meta.textContent = extra || ({user:'用户', assistant:'Agent', tool:'工具'}[role] || role);
+    body.textContent = text(content); item.appendChild(meta); item.appendChild(body);
+    $('agentChat').appendChild(item); $('agentChat').scrollTop = $('agentChat').scrollHeight;
+  }
+  function loadHistory() {
+    clear($('agentChat')); if (!currentSession) { return; }
+    api('GET', '/v1/agent/sessions/' + encodeURIComponent(currentSession) + '/history', null, function (err, data) {
+      var items, i; if (err) { addMessage('tool', err.message, '请求失败'); return; }
+      items = data.data || []; for (i = 0; i < items.length; i++) { addMessage(items[i].role === 'assistant' ? 'assistant' : 'user', items[i].content, items[i].source || items[i].role); }
+    });
+  }
+  function refreshSessions(selectLast) {
+    api('GET', '/v1/agent/sessions', null, function (err, data) {
+      var list, select, i, option, found = false;
+      if (err) { $('agentHint').textContent = 'Agent 会话接口不可用：' + err.message; return; }
+      list = data.data || []; select = $('sessions'); clear(select);
+      for (i = 0; i < list.length; i++) { option = new Option(list[i].id + ' · ' + list[i].message_count + ' 条消息', list[i].id); select.add(option); if (list[i].id === currentSession) { found = true; } }
+      if (selectLast && list.length) { currentSession = list[list.length - 1].id; }
+      if (!found && currentSession && !selectLast) { currentSession = list.length ? list[0].id : ''; }
+      if (!currentSession && list.length) { currentSession = list[0].id; }
+      select.value = currentSession; $('agentHint').textContent = currentSession ? '会话 ' + currentSession + ' 已选中' : '尚无会话'; loadHistory();
+    });
+  }
+  function refreshModels() {
+    router('GET', 'v1/models', null, null, function (err, models) {
+      var all, list, i, model, card, title, state, type, select, traces;
+      if (err) { connection(false, 'Router 不可用：' + err.message); show('traces', err.message); return; }
+      all = models.data || []; list = $('models'); clear(list);
+      for (i = 0; i < all.length; i++) { model = all[i]; card = document.createElement('div'); card.className = 'model'; title = document.createElement('b'); title.textContent = model.id; state = document.createElement('span'); state.className = model.status || 'offline'; state.textContent = model.type + ' · ' + (model.status || 'offline'); card.appendChild(title); card.appendChild(state); list.appendChild(card); }
+      for (type = 0; type < 2; type++) { select = $(type === 0 ? 'chatModel' : 'audioModel'); clear(select); for (i = 0; i < all.length; i++) { if (all[i].type === (type === 0 ? 'chat' : 'audio')) { select.add(new Option(all[i].id + ' (' + all[i].status + ')', all[i].id)); } } }
+      router('GET', 'v1/agent/traces', null, null, function (traceErr, traceData) { if (traceErr) { show('traces', traceErr.message); } else { traces = traceData.traces || []; renderTraces(traces); } connection(true, 'Agent 与 Router 已连接（兼容模式）'); });
+    });
+  }
+  function newSession() { api('POST', '/v1/agent/sessions', '{}', function (err, data) { if (err) { alert(err.message); return; } currentSession = data.id; refreshSessions(false); }); }
+  function sendAgent() {
+    var input = $('agentInput'), value = input.value.replace(/^\s+|\s+$/g, ''), button = $('sendAgent');
+    if (!value) { return; } if (!currentSession) { newSession(); $('agentHint').textContent = '会话已创建，请再次点击发送'; return; }
+    button.disabled = true; addMessage('user', value); input.value = ''; $('agentHint').textContent = 'Agent 正在执行…';
+    api('POST', '/v1/agent/prompt', JSON.stringify({session_id: currentSession, text: value}), function (err, data) {
+      var commands, i, command; button.disabled = false;
+      if (err) { addMessage('tool', err.message, '请求失败'); $('agentHint').textContent = '请求失败'; return; }
+      addMessage('assistant', data.text || '（Agent 未返回文字）'); commands = data.commands || [];
+      for (i = 0; i < commands.length; i++) { command = commands[i]; addMessage('tool', command.name + ': ' + (command.success ? '成功' : '失败') + '\n' + text(command.data || command.error || '无返回内容'), command.type); }
+      renderPromptResult(value, data); refreshSessions(false);
+    });
+  }
+  function sendModel() {
+    var content = $('modelInput').value.replace(/^\s+|\s+$/g, ''), button = $('sendModel'); if (!content) { return; }
+    button.disabled = true; show('modelOutput', '请求中…');
+    router('POST', 'v1/chat/completions', JSON.stringify({model: $('chatModel').value, messages: [{role: 'user', content: content}], stream: false}), 'application/json', function (err, data) { button.disabled = false; show('modelOutput', err ? err.message : data); });
+  }
+  function transcribe(file) {
+    var form; if (!file) { return; } form = new FormData(); form.append('model', $('audioModel').value); form.append('file', file, file.name || 'recording.webm'); show('asrOutput', '转写中…');
+    router('POST', 'v1/audio/transcriptions', form, null, function (err, data) { show('asrOutput', err ? err.message : data); });
+  }
+  function speak() {
+    var input = $('ttsInput').value.replace(/^\s+|\s+$/g, ''); if (!input) { return; }
+    router('POST', 'v1/audio/speech', JSON.stringify({model: 'vits-melo-tts', input: input}), 'application/json', function (err, data) { if (err || !data.audio) { alert('TTS 失败：' + (err ? err.message : '未返回 audio')); return; } $('audioPlayer').src = 'data:audio/wav;base64,' + data.audio; $('audioPlayer').play(); });
+  }
+  $('newSession').onclick = newSession; $('deleteSession').onclick = function () { if (!currentSession || !confirm('删除当前会话？')) { return; } api('DELETE', '/v1/agent/sessions/' + encodeURIComponent(currentSession), null, function () { currentSession = ''; refreshSessions(true); }); };
+  $('sessions').onchange = function () { currentSession = this.value; loadHistory(); }; $('sendAgent').onclick = sendAgent; $('sendModel').onclick = sendModel; $('transcribe').onclick = function () { transcribe($('audioFile').files[0]); }; $('speak').onclick = speak;
+  $('record').onclick = function () { $('recordingHint').textContent = '当前浏览器不支持麦克风录音，请选择音频文件转写。'; };
+  refreshSessions(true); refreshModels(); window.setInterval(refreshModels, 5000);
+}());
+</script>
+<script>
+/* Chrome remote-audio.v1 device: intentionally uses the production /ws path. */
+(() => {
+  const $ = id => document.getElementById(id);
+  const protocol = 'remote-audio.v1';
+  let ws, mediaStream, audioContext, processor, source, monitoring = false, protocolReady = false;
+  let monitorSeq = 0, operation = null, playbackQueue = [], playing = false;
+  const set = (id, value) => { $(id).textContent = value == null ? '' : String(value); };
+  const setRecordSignal = (value, state='') => { const el=$('voiceRecordSignal');el.textContent=value;el.className='record-signal '+state; };
+  const log = (label, data={}) => { const line = `[${new Date().toLocaleTimeString()}] ${label}${Object.keys(data).length ? ' ' + JSON.stringify(data) : ''}`; const el = $('voiceLog'); el.textContent = (el.textContent + '\n' + line).slice(-8000); el.scrollTop = el.scrollHeight; };
+  const send = data => { if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(Object.assign({protocol}, data))); };
+  const audioMessage = (type, operationId, seq, pcm, isLast=false) => ({type, operation_id:operationId, seq, is_first:seq===0, is_last:isLast, audio:{encoding:'pcm_s16le',sample_rate:16000,channels:1,data:toBase64(pcm)}});
+  const toBase64 = buffer => { const bytes = new Uint8Array(buffer), part = 0x8000; let binary = ''; for (let i=0;i<bytes.length;i+=part) binary += String.fromCharCode(...bytes.subarray(i,i+part)); return btoa(binary); };
+  const fromBase64 = value => { const raw=atob(value), bytes=new Uint8Array(raw.length); for(let i=0;i<raw.length;i++)bytes[i]=raw.charCodeAt(i); return bytes.buffer; };
+  function pcm16(samples, rate) { const count=Math.max(1,Math.round(samples.length*16000/rate)), output=new Int16Array(count); for(let i=0;i<count;i++){const sample=Math.max(-1,Math.min(1,samples[Math.min(samples.length-1,Math.floor(i*rate/16000))]));output[i]=sample<0?sample*0x8000:sample*0x7fff;} return output.buffer; }
+  function sendFrame(input) { const pcm=pcm16(input,audioContext.sampleRate); if (!pcm.byteLength) return; if (operation && operation.recording) { const final=operation.stopRequested; send(audioMessage('record.chunk',operation.id,operation.seq++,pcm,final)); if(final){send({type:'record.completed',operation_id:operation.id}); log('录音完成回执',{operation_id:operation.id}); operation.recording=false; operation=null;} return; } if(monitoring) send({type:'monitor.audio',stream_id:'chrome-'+location.host,seq:monitorSeq++,audio:{encoding:'pcm_s16le',sample_rate:16000,channels:1,data:toBase64(pcm)}}); }
+  async function ensureAudio() { if (!audioContext) audioContext=new (window.AudioContext||window.webkitAudioContext)(); await audioContext.resume(); }
+  async function openMic() { if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error('当前页面不是安全上下文或浏览器不支持 getUserMedia；请使用 HTTPS。'); await ensureAudio(); if(mediaStream)return; mediaStream=await navigator.mediaDevices.getUserMedia({audio:{channelCount:1,echoCancellation:true,noiseSuppression:true}}); source=audioContext.createMediaStreamSource(mediaStream); processor=audioContext.createScriptProcessor(4096,1,1); processor.onaudioprocess=e=>sendFrame(e.inputBuffer.getChannelData(0)); source.connect(processor); processor.connect(audioContext.destination); }
+  function closeDevice() { monitoring=false;protocolReady=false; if(ws)ws.close(); ws=null; if(processor)processor.disconnect(); if(source)source.disconnect(); if(mediaStream)mediaStream.getTracks().forEach(track=>track.stop()); if(audioContext)audioContext.close(); processor=source=mediaStream=audioContext=null; operation=null; playbackQueue=[]; playing=false; $('voiceListen').disabled=true;$('voiceListen').textContent='开始热词监听';$('voiceStop').disabled=true;$('voiceConnect').disabled=false;set('voiceState','已断开');setRecordSignal('设备已断开',''); }
+  function beginRecord(message) { operation={id:message.operation_id,name:message.operation,recording:true,stopRequested:false,seq:0}; send({type:'record.started',operation_id:operation.id}); set('voiceState','服务端录音中 · '+operation.name);setRecordSignal('● 正在录音，请现在说话','active');log('开始录音',{operation:operation.name,operation_id:operation.id}); }
+  async function playNext() { if(playing||!playbackQueue.length)return; playing=true; const chunk=playbackQueue.shift(); set('voiceTts',chunk.text||'（无文字）'); log('TTS 播放片段',{text:chunk.text,is_last:chunk.is_last}); try { const decoded=await audioContext.decodeAudioData(fromBase64(chunk.audio.data)); const node=audioContext.createBufferSource();node.buffer=decoded;node.connect(audioContext.destination);node.onended=()=>{playing=false;if(chunk.is_last){send({type:'playback.completed',operation_id:chunk.operation_id});log('播放完成',{operation_id:chunk.operation_id});if(operation&&operation.name==='speak_and_record')beginRecord({operation_id:operation.id,operation:operation.name});}playNext();};node.start(); } catch(error){ log('播放失败',{message:error.message}); send({type:'operation.error',operation_id:chunk.operation_id,error:{code:'PLAYBACK_FAILED',message:error.message,retryable:false}});playing=false;} }
+  function onMessage(event) { let data; try{data=JSON.parse(event.data);}catch(_){return;} log('← '+data.type,data.type==='playback.chunk'?{text:data.text}:data); if(data.type==='hello.required'){send({type:'hello',device_id:'chrome-debug-'+Date.now(),capabilities:{operations:['speak','record','speak_and_record'],playback_formats:['wav'],record_format:{encoding:'pcm_s16le',sample_rate:16000,channels:1}}});return;} if(data.type==='hello.ack'){protocolReady=true;set('voiceState','协议就绪，等待监听');setRecordSignal('等待热词；命中“小麦”后才会开始录音');$('voiceListen').disabled=false;$('voiceListen').textContent='开始热词监听';$('voiceFixturePlay').disabled=false;return;} if(data.type==='state'){set('voiceState',data.state+(data.error?' · '+data.error.message:''));return;} if(data.type==='hotword.hit'){set('voiceHotword','命中：'+data.word);setRecordSignal('热词已命中，正在准备录音…');if(typeof window.resetTraceForHotword==='function')window.resetTraceForHotword();return;} if(data.type==='asr.result'){set('voiceAsr',data.text||'（空）');return;} if(data.type==='agent.output'){set('voiceAgent',data.text||'（空）');return;} if(data.type==='operation.start'){operation={id:data.operation_id,name:data.operation,recording:false,stopRequested:false,seq:0};send({type:'operation.accepted',operation_id:operation.id});log('接受操作',{operation:operation.name,operation_id:operation.id});if(operation.name==='record')beginRecord(data);return;} if(data.type==='record.stop'&&operation){operation.stopRequested=true;set('voiceState','录音停止：'+data.reason);setRecordSignal('✓ 录音结束，正在进行语音识别…','done');return;} if(data.type==='playback.chunk'){playbackQueue.push(data);playNext();return;} if(data.type==='operation.completed'){log('操作完成',data);return;} if(data.type==='protocol.error'||data.type==='operation.error'){set('voiceState','错误：'+(data.error&&data.error.message||data.message||data.type));setRecordSignal('语音操作出错，请查看协议日志','');} }
+  $('voiceConnect').onclick=async()=>{try{protocolReady=false;set('voiceState','初始化音频与 WebSocket…');await ensureAudio();const scheme=location.protocol==='https:'?'wss:':'ws:';ws=new WebSocket(scheme+'//'+location.host+'/ws');ws.onopen=()=>{set('voiceState','WebSocket 已连接，正在协商协议…');$('voiceStop').disabled=false;$('voiceConnect').disabled=true;$('voiceListen').disabled=false;$('voiceListen').textContent='等待协议就绪…';log('→ WebSocket 已打开');};ws.onmessage=onMessage;ws.onclose=()=>{log('WebSocket 已关闭');closeDevice();};ws.onerror=()=>set('voiceState','WebSocket 连接错误');}catch(error){set('voiceState','无法启动：'+error.message);log('启动失败',{message:error.message});}};
+  $('voiceListen').onclick=async()=>{if(!protocolReady){set('voiceState','协议仍在协商；请等待“协议就绪”提示');return;}try{await openMic();monitoring=!monitoring;monitorSeq=0;$('voiceListen').textContent=monitoring?'停止热词监听':'开始热词监听';set('voiceState',monitoring?'正在监听热词“小麦”':'已暂停监听');log(monitoring?'开始监听':'暂停监听');}catch(error){set('voiceState','麦克风不可用：'+error.message);setRecordSignal('麦克风权限不可用；请检查 HTTP 白名单或网站权限','');log('麦克风错误',{message:error.message});}};
+  $('voiceFixturePlay').onclick=async()=>{const file=$('voiceFixture').files[0];if(!file||!audioContext||!ws||ws.readyState!==WebSocket.OPEN){set('voiceState','请先连接设备并选择一个音频文件');return;}try{const buffer=await audioContext.decodeAudioData(await file.arrayBuffer());monitoring=true;monitorSeq=0;set('voiceState','正在回放测试音频并监听热词');for(let start=0;start<buffer.length;start+=4096){if(!monitoring)break;sendFrame(buffer.getChannelData(0).subarray(start,Math.min(buffer.length,start+4096)));await new Promise(resolve=>setTimeout(resolve,10));}for(let count=0;operation&&operation.recording&&!operation.stopRequested&&count<120;count++){sendFrame(new Float32Array(1600));await new Promise(resolve=>setTimeout(resolve,100));}if(operation&&operation.recording&&operation.stopRequested)sendFrame(new Float32Array(1600));log('测试音频回放完成',{name:file.name});}catch(error){set('voiceState','测试音频解码失败：'+error.message);}}; $('voiceStop').onclick=closeDevice;
+  set('voiceSecureHint',window.isSecureContext?'安全上下文：可请求麦克风权限':'当前为非安全 HTTP：Chrome 会拒绝麦克风权限；请配置 HTTPS 后测试完整录音链路。');
+})();
+</script>
+</body>
+</html>

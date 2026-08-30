@@ -1,0 +1,93 @@
+{
+  "format": "qwen3_embedding_bf16_vs_w4bf16_profile_v2",
+  "text": "北京是中国的首都，天安门广场位于北京市中心。今天是2026年8月2日，欢迎使用Qwen3 Embedding模型进行检索与语义匹配。",
+  "token_count": 41,
+  "fixed_conditions": {
+    "device_id": 0,
+    "sequence_bucket": 512,
+    "warmup_calls_per_model": 3,
+    "measured_calls_per_model": 10,
+    "normalization": "L2 after MRL prefix",
+    "same_tokenizer": true,
+    "execution": "separate process per bmodel; explicit SAIL Tensor maps for BF16"
+  },
+  "runtime": {
+    "python": "3.10.20",
+    "numpy": "2.2.6",
+    "sophon_sail": "3.11.0"
+  },
+  "models": {
+    "bf16": {
+      "model": "bf16",
+      "text": "北京是中国的首都，天安门广场位于北京市中心。今天是2026年8月2日，欢迎使用Qwen3 Embedding模型进行检索与语义匹配。",
+      "token_count": 41,
+      "load_ms": 3563.6349,
+      "cold_encode_ms": 334.4986,
+      "warm_encode_ms": {
+        "min_ms": 311.504,
+        "p50_ms": 314.3033,
+        "p95_ms": 316.8013,
+        "max_ms": 316.9767,
+        "mean_ms": 314.0808
+      },
+      "vector_norm": 1.0,
+      "vector256_norm": 1.0,
+      "sha256": "947c98a8a9a55295164eb53b990e48d14af474e06a69f2bdd7ae06f80f84398e",
+      "python": "3.10.20",
+      "sophon_sail": "3.11.0"
+    },
+    "w4bf16": {
+      "model": "w4bf16",
+      "text": "北京是中国的首都，天安门广场位于北京市中心。今天是2026年8月2日，欢迎使用Qwen3 Embedding模型进行检索与语义匹配。",
+      "token_count": 41,
+      "load_ms": 2658.3215,
+      "cold_encode_ms": 349.7734,
+      "warm_encode_ms": {
+        "min_ms": 328.5587,
+        "p50_ms": 332.3776,
+        "p95_ms": 335.9258,
+        "max_ms": 335.9928,
+        "mean_ms": 332.4421
+      },
+      "vector_norm": 1.0,
+      "vector256_norm": 1.0,
+      "sha256": "d7d26e840b46f856f5569617d54e710a8e4a0280fa90a568d9ed9b58dde78451",
+      "python": "3.10.20",
+      "sophon_sail": "3.11.0"
+    }
+  },
+  "latency_comparison": {
+    "warm_p50_speedup_bf16_over_w4": 0.9456211850618093,
+    "warm_mean_speedup_bf16_over_w4": 0.9447684273441902,
+    "w4_warm_latency_change_pct": 5.750591864609755,
+    "w4_model_size_reduction_pct": 53.11812603056419
+  },
+  "embedding_comparison": {
+    "1024": {
+      "dimensions": 1024,
+      "cosine_similarity": 0.9142239093780518,
+      "l2_distance": 0.41418877243995667,
+      "max_abs_difference": 0.04667734354734421,
+      "mean_abs_difference": 0.010170767083764076,
+      "mean_relative_abs_difference": 7849.5869140625,
+      "bf16_norm": 1.0,
+      "w4bf16_norm": 1.0,
+      "norm_absolute_difference": 0.0
+    },
+    "256": {
+      "dimensions": 256,
+      "cosine_similarity": 0.9022942185401917,
+      "l2_distance": 0.44205376505851746,
+      "max_abs_difference": 0.09314277768135071,
+      "mean_abs_difference": 0.021251190453767776,
+      "mean_relative_abs_difference": 34101.87109375,
+      "bf16_norm": 1.0,
+      "w4bf16_norm": 1.0,
+      "norm_absolute_difference": 0.0
+    }
+  },
+  "interpretation": {
+    "symmetric_quantization_usable_for_similarity": false,
+    "note": "This is a single mixed Chinese/numeric/English text; use a representative corpus before production approval."
+  }
+}

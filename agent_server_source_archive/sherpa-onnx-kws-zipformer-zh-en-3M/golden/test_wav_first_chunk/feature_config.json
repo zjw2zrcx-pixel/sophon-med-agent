@@ -1,0 +1,41 @@
+{
+  "producer": "sherpa-onnx compatible preprocessing",
+  "sherpa_onnx_version": "1.13.4",
+  "input_wav": "test.wav",
+  "input_sample_rate": 44100,
+  "input_channels": 2,
+  "mono_policy": "arithmetic mean; channels are bit-identical for this test.wav",
+  "resampler": {
+    "implementation": "sherpa_onnx::LinearResample",
+    "output_sample_rate": 16000,
+    "filter_cutoff_hz": 7920.0,
+    "num_zeros": 6
+  },
+  "fbank": {
+    "num_bins": 80,
+    "sample_rate": 16000,
+    "frame_length_ms": 25,
+    "frame_shift_ms": 10,
+    "low_freq_hz": 20,
+    "high_freq_hz": -400,
+    "dither": 0,
+    "snip_edges": false,
+    "remove_dc_offset": true,
+    "preemph_coeff": 0.97,
+    "window_type": "povey",
+    "round_to_power_of_two": true,
+    "is_librosa": false,
+    "normalize_samples": true
+  },
+  "first_encoder_call": {
+    "x_shape": [
+      1,
+      45,
+      80
+    ],
+    "all_cache_states": "float32 zero",
+    "processed_lens": [
+      0
+    ]
+  }
+}

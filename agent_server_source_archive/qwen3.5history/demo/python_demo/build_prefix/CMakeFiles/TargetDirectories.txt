@@ -1,0 +1,7 @@
+/data/structure/qwen3.5history/demo/python_demo/build_prefix/CMakeFiles/install/local.dir
+/data/structure/qwen3.5history/demo/python_demo/build_prefix/CMakeFiles/install.dir
+/data/structure/qwen3.5history/demo/python_demo/build_prefix/CMakeFiles/list_install_components.dir
+/data/structure/qwen3.5history/demo/python_demo/build_prefix/CMakeFiles/rebuild_cache.dir
+/data/structure/qwen3.5history/demo/python_demo/build_prefix/CMakeFiles/edit_cache.dir
+/data/structure/qwen3.5history/demo/python_demo/build_prefix/CMakeFiles/install/strip.dir
+/data/structure/qwen3.5history/demo/python_demo/build_prefix/CMakeFiles/chat.dir

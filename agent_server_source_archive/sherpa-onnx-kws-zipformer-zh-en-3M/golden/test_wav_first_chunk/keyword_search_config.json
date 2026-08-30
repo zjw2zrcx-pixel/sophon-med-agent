@@ -1,0 +1,6 @@
+{
+  "max_active_paths": 4,
+  "keywords_score": 2.0,
+  "keywords_threshold": 0.18,
+  "num_trailing_blanks": 1
+}

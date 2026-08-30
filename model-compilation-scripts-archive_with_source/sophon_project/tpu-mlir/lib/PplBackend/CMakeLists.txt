@@ -1,0 +1,87 @@
+cmake_minimum_required(VERSION 3.5)
+project(PplJitHost LANGUAGES C CXX)
+
+option(BUILD_STATIC "Build as static library (default)" ON)
+option(BUILD_DYN_HOST "Build as static library (default)" OFF)
+option(BUILD_KERNEL_MODULE "Build the embedded device kernel module" ON)
+set(BUILD_DIR "build" CACHE STRING "Build directory")
+# Resolve BUILD_DIR to an absolute path so that both relative and absolute
+# values work correctly with include_directories / aux_source_directory.
+if(IS_ABSOLUTE "${BUILD_DIR}")
+  set(BUILD_DIR_ABS "${BUILD_DIR}")
+else()
+  set(BUILD_DIR_ABS "${CMAKE_CURRENT_SOURCE_DIR}/${BUILD_DIR}")
+endif()
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wl,--no-undefined")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wl,--no-undefined")
+
+if(NOT DEFINED ENV{PPL_PROJECT_ROOT})
+  message(FATAL_ERROR "Please set environ PPL_PROJECT_ROOT to ppl release path")
+else()
+  set(PPL_TOP $ENV{PPL_PROJECT_ROOT})
+  message(NOTICE "PPL_PATH: ${PPL_TOP}")
+endif()
+
+if(DEBUG)
+  set(CMAKE_BUILD_TYPE "Debug")
+  add_definitions(-DDEBUG)
+else()
+  set(CMAKE_BUILD_TYPE "Release")
+  if(NOT USING_CUDA)
+    add_definitions(-O3)
+  endif()
+endif()
+
+set(KERNEL_TOP ${PPL_TOP}/deps/common/dev/kernel)
+set(HOST_TOP ${PPL_TOP}/deps/common/host)
+
+include_directories(${KERNEL_TOP})
+include_directories(${HOST_TOP}/include)
+include_directories($ENV{PROJECT_ROOT}/include)
+include_directories($ENV{TPUC_ROOT}/include)
+include_directories(include)
+include_directories(${BUILD_DIR_ABS}/include)
+# Dynamic descriptor sources include the chip ABI header directly.  Dynkernel
+# normally contributes this path, but transactional builds may deliberately
+# skip the device module when a native AArch64 module is supplied separately.
+if(BUILD_DYN_HOST AND "${CHIP}" STREQUAL "bm1684x")
+  include_directories($ENV{PPL_RUNTIME_PATH}/chip/tpu_6_0/TPU1686/kernel/include)
+endif()
+aux_source_directory(${BUILD_DIR_ABS}/host PL_SRC)
+
+# compile cpp
+aux_source_directory(src TILING_SRC)
+include($ENV{PPL_RUNTIME_PATH}/scripts/GenChipDef.cmake)
+if(BUILD_STATIC)
+  set(ADDITIONAL_SRC ${HOST_TOP}/src/ppl_jit.cpp
+                    ${HOST_TOP}/src/host_utils.cpp)
+  add_library(ppl_host SHARED ${TILING_SRC} ${PL_SRC} ${ADDITIONAL_SRC})
+
+  install(TARGETS ppl_host DESTINATION lib)
+else()
+  if(DEFINED DEV_MODE)
+    message(NOTICE "DEV_MODE: ${DEV_MODE}")
+  endif()
+  list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}")
+  if(BUILD_KERNEL_MODULE)
+    include(Dynkernel)
+  endif()
+  if(BUILD_DYN_HOST)
+    if(${CHIP} STREQUAL "sg2260e")
+      set(DYN_HOST_NAME ppl_dyn_host_bm1690e)
+    elseif(${CHIP} STREQUAL "sg2260erv")
+      set(DYN_HOST_NAME ppl_dyn_host_bm1690erv)
+    else()
+      set(DYN_HOST_NAME ppl_dyn_host_${CHIP})
+    endif()
+
+    set(ADDITIONAL_SRC ${HOST_TOP}/src/host_utils.cpp)
+    add_library(${DYN_HOST_NAME} SHARED ${TILING_SRC} ${PL_SRC} ${ADDITIONAL_SRC})
+    install(TARGETS ${DYN_HOST_NAME} DESTINATION lib)
+  endif()
+endif()
